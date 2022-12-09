@@ -1,3 +1,0 @@
-[submodule "recsys-dataset"]
-	path = recsys-dataset
-	url = https://github.com/otto-de/recsys-dataset.git
