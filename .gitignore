@@ -7,4 +7,6 @@ data/otto-train-and-test-data-for-local-validation/
 src/baseline/validation_predictions.csv
 src/baseline/test_predictions.csv
 
+src/chris_baseline/data/
 src/chris_baseline/test_predictions.csv
+src/chris_baseline/validation_predictions.csv
