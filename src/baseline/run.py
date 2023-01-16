@@ -9,10 +9,11 @@ import otto_recommender_system.validating
 if __name__ == "__main__":
     train_df, valid_df, test_df = ors.data.get_datasets(type_of_tidy_data="parquet")
 
-    train_df["type"] = train_df["type"].str.decode("utf-8")
+    # train_df["type"] = train_df["type"].str.decode("utf-8")
     train_cudf = cudf.from_pandas(train_df)
 
-    unique_types = train_cudf["type"].unique().to_numpy("U8")
+    # unique_types = train_cudf["type"].unique().to_numpy("U8")
+    unique_types = train_cudf["type"].unique().to_numpy()
 
     count_cudf_series_dict = {
         type_: train_cudf[train_cudf["type"] == type_]["aid"].value_counts()

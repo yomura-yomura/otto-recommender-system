@@ -15,22 +15,30 @@ if not official_data_path.exists():
     raise FileNotFoundError(official_data_path)
 
 
-def get_n_lines():
-    with open(official_data_path / "train.jsonl") as f:
+def get_n_lines(file_path):
+    with open(file_path) as f:
         return sum(1 for _ in f)
 
 
 
 def event_dict_to_np_array(event_dict: dict):
     assert tuple(event_dict.keys()) == ("aid", "ts", "type")
-    return event_dict["aid"], event_dict["ts"], event_dict["type"]
+    return event_dict["aid"], event_dict["ts"], all_types.index(event_dict["type"])
+
+
+def labels_dict_to_np_array(labels_dict: dict):
+    return [
+        (aid, np.datetime64("NaT"), all_types.index(type_))
+        for type_ in all_types
+        if type_ in labels_dict.keys()
+        for aid in (
+            labels_dict[type_] if isinstance(labels_dict[type_], list) else [labels_dict[type_]]
+        )
+    ]
 
 
 max_n_events = 500
-n_records_dict = {
-    "train": 12_899_779,
-    "test": 1_671_803
-}
+all_types = ["clicks", "carts", "orders"]
 
 
 def get_np_tidy_data(
@@ -38,8 +46,8 @@ def get_np_tidy_data(
         data_path=official_data_path,
         tidy_data_path=project_root_path / "data" / "otto-recommender-system-tidy-data"
 ):
-    if dataset_type not in ("train", "test"):
-        raise ValueError("dataset_type must be 'train' or 'test'")
+    if dataset_type not in ("train", "test", "test_labels"):
+        raise ValueError("dataset_type must be 'train', 'test' or 'test_labels'")
 
     np_tidy_data_path = tidy_data_path / "npz"
     np_tidy_data_path.mkdir(exist_ok=True)
@@ -57,10 +65,10 @@ def get_np_tidy_data(
             ("session", "i4"),
             ("aid", "i4"),
             ("ts", "M8[ms]"),
-            ("type", "S6")
+            ("type", "i1")
         ]
     )
-    chunk_size = 100000
+    chunk_size = 100_000
 
     target_fn = data_path / f"{dataset_type}.jsonl"
     if not target_fn.exists():
@@ -69,36 +77,29 @@ def get_np_tidy_data(
         raise FileNotFoundError(data_path / f"[{dataset_type}/{dataset_type}_sessions].jsonl")
     
     chunks = pd.read_json(target_fn, lines=True, chunksize=chunk_size)
+    n_records = get_n_lines(target_fn)
 
-    for chunk in tqdm.tqdm(chunks, total=int(np.ceil(n_records_dict["train"] / chunk_size))):
-        assert np.all(chunk.columns == ["session", "events"])
-
-        np_tidy_data = np.concatenate([
-            np_tidy_data,
-            np.array([
-                (session, *event_dict_to_np_array(event))
-                for session, events in zip(chunk["session"], chunk["events"])
-                for event in events
-            ], dtype=np_tidy_data.dtype)
-        ])
-        # print(f"{np_tidy_data.nbytes // 1024 ** 3:.4f} GB")
-
-
-    # all_types = np.array(["clicks", "carts", "orders"], dtype="S")
-
-    # a = np.empty(
-    #     len(np_tidy_data),
-    #     dtype=[
-    #         ("session", "i4"),
-    #         ("aid", "i4"),
-    #         ("ts", "M8[ms]"),
-    #         *(
-    #             (f"is_{type_.decode()}", "?")
-    #             for type_ in all_types
-    #         )
-    #     ]
-    # )
-
+    for chunk in tqdm.tqdm(chunks, total=int(np.ceil(n_records / chunk_size))):
+        if dataset_type == "test_labels":
+            assert np.all(chunk.columns == ["session", "labels"])
+            np_tidy_data = np.concatenate([
+                np_tidy_data,
+                np.array([
+                    (session, *args)
+                    for session, labels_dict in zip(chunk["session"], chunk["labels"])
+                    for args in labels_dict_to_np_array(labels_dict)
+                ], dtype=np_tidy_data.dtype)
+            ])
+        else:
+            assert np.all(chunk.columns == ["session", "events"])
+            np_tidy_data = np.concatenate([
+                np_tidy_data,
+                np.array([
+                    (session, *event_dict_to_np_array(event))
+                    for session, events in zip(chunk["session"], chunk["events"])
+                    for event in events
+                ], dtype=np_tidy_data.dtype)
+            ])
 
     np.savez_compressed(np_tidy_data_cachefile_path, np_tidy_data)
     return np_tidy_data
@@ -109,8 +110,8 @@ def get_pd_tidy_data(
         data_path=official_data_path,
         tidy_data_path=project_root_path / "data" / "otto-recommender-system-tidy-data"
 ):
-    if dataset_type not in ("train", "test"):
-        raise ValueError("dataset_type must be 'train' or 'test'")
+    if dataset_type not in ("train", "test", "test_labels"):
+        raise ValueError("dataset_type must be 'train', 'test' or 'test_labels'")
 
     pd_tidy_data_path = tidy_data_path / "parquet"
     pd_tidy_data_path.mkdir(exist_ok=True)
@@ -129,22 +130,38 @@ def get_pd_tidy_data(
 
 
 
-def get_datasets(days=7, type_of_tidy_data="npz"):
+def get_datasets(days=7, type_of_tidy_data="npz", return_train=True, return_valid=True, return_test=True, return_valid_labels=False):
     dirname = f"{days}days"
 
     data_path = project_root_path / "data" / "otto-train-and-test-data-for-local-validation" / dirname / "jsonl"
     tidy_data_path = project_root_path / "data" / "otto-train-and-test-data-for-local-validation" / dirname
-    
+
+    valid_labels_tidy_data = None
+
     if type_of_tidy_data == "npz":
         train_tidy_data = get_np_tidy_data("train", data_path, tidy_data_path)
         valid_tidy_data = get_np_tidy_data("test", data_path, tidy_data_path)
         test_tidy_data = get_np_tidy_data("test")
+        if return_valid_labels:
+            valid_labels_tidy_data = get_np_tidy_data("test_labels", data_path, tidy_data_path)
     elif type_of_tidy_data == "parquet":
         train_tidy_data = get_pd_tidy_data("train", data_path, tidy_data_path)
         valid_tidy_data = get_pd_tidy_data("test", data_path, tidy_data_path)
         test_tidy_data = get_pd_tidy_data("test")
+        if return_valid_labels:
+            valid_labels_tidy_data =  get_pd_tidy_data("test_labels", data_path, tidy_data_path)
     else:
         raise ValueError(type_of_tidy_data)
 
-    return train_tidy_data, valid_tidy_data, test_tidy_data
 
+    ret = []
+    if return_train:
+        ret += [train_tidy_data]
+    if return_valid:
+        ret += [valid_tidy_data]
+    if return_test:
+        ret += [test_tidy_data]
+    if return_valid_labels:
+        ret += [valid_labels_tidy_data]
+
+    return ret
