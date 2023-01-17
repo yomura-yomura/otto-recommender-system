@@ -17,14 +17,10 @@ class CoVisitationMatrix:
             types_to_use: Optional[List[Union[int, str]]] = None,
             weight_func: Optional[Callable[[cudf.DataFrame], Dict[Union[int, str], Union[int, float]]]] = None
     ):
-        all_aid = np.unique(all_train_df["aid"])
-        assert all_aid.min() == 0
-        assert all_aid.max() == len(all_aid) - 1
-
         all_sessions, indices_in_all_sessions = np.unique(all_train_df["session"], return_index=True)
 
-        self.dirname = pathlib.Path(cache_dir_path) / dirname
-        self.dirname.mkdir(exist_ok=True)
+        self.dirname = pathlib.Path(cache_dir_path) / dirname / f"n-seperated-aid_{n_seperated_aid}"
+        self.dirname.mkdir(exist_ok=True, parents=True)
 
         def _validate_type_as_int(type_):
             return _data_module.all_types.index(type_) if isinstance(type_, str) else int(type_)
@@ -44,6 +40,9 @@ class CoVisitationMatrix:
         else:
             self.weight_func = lambda _: 1
 
+        all_aid = np.unique(all_train_df["aid"])
+        # assert all_aid.min() == 0
+        # assert all_aid.max() == len(all_aid) - 1
         n_unique_aid = len(all_aid)
         self.aid_edges = np.linspace(0, n_unique_aid, n_seperated_aid).astype(np.int32)
         self.total_weight_cudf: Optional[cudf.DataFrame] = None
@@ -109,7 +108,7 @@ class CoVisitationMatrix:
 
     def make(self, max_timedelta: np.timedelta64):
         for i_seperated_aid in range(self.n_seperated_aid):
-            print(f"({i_seperated_aid + 1}/{self.n_seperated_aid}) split aid at {self.dirname.name}")
+            print(f"({i_seperated_aid + 1}/{self.n_seperated_aid}) split aid at {'/'.join(self.dirname.parts[-2:])}")
             target_fn = self.dirname / f"{i_seperated_aid}.parquet"
             if target_fn.exists():
                 continue
