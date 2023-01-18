@@ -18,6 +18,13 @@ async def _validate_coroutine(prediction_csv_path, days):
 
     test_labels_path = train_test_local_validation_data_path / f"{days}days" / "jsonl" / "test_labels.jsonl"
 
+    await asyncio.create_subprocess_exec(
+        *[
+            "python", "-m", "pipenv", "sync"
+        ],
+        cwd=competition_host_git_repos_path
+    )
+
     proc = await asyncio.create_subprocess_exec(
         *[
             "python", "-m", "pipenv", "run", "python", "-m", "src.evaluate",

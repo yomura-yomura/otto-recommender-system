@@ -1,5 +1,4 @@
 import pathlib
-
 import cudf
 from .. import data as _data_module
 import numpy as np
@@ -7,6 +6,7 @@ from typing import Optional, List, Union, Dict, Callable
 import tqdm
 import pandas as pd
 import json
+import warnings
 
 
 class CoVisitationMatrix:
@@ -126,6 +126,13 @@ class CoVisitationMatrix:
         chunk_cudf = cudf.from_pandas(chunk_df)
         if self.types_to_use is not None:
             chunk_cudf = chunk_cudf.loc[chunk_cudf["type"].isin(self.types_to_use)]
+
+        if True:
+            warnings.warn("* n < 30")
+            chunk_cudf = chunk_cudf.sort_values(['session', 'ts'], ascending=[True, False])
+            chunk_cudf = chunk_cudf.reset_index(drop=True)
+            chunk_cudf['n'] = chunk_cudf.groupby('session').cumcount()
+            chunk_cudf = chunk_cudf.loc[chunk_cudf["n"] < 30].drop('n', axis=1)
 
         chunk_cudf = chunk_cudf.merge(chunk_cudf, on="session")
         aid_edges = self.aid_edges

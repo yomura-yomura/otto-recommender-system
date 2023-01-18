@@ -13,5 +13,10 @@ rm otto-recommender-system-tidy-data.zip
 
 echo "* Download the kaggle dataset: ranchantan/otto-recommender-system-tidy-data"
 kaggle datasets download -d ranchantan/otto-train-and-test-data-for-local-validation && \
-unzip otto-train-and-test-data-for-local-validation.zip -d otto-train-and-test-data-for-local-validation && \
+unzip otto-train-and-test-data-for-local-validation.zip -d data/otto-train-and-test-data-for-local-validation && \
 rm otto-train-and-test-data-for-local-validation.zip
+
+
+echo "export PYTHONPATH=$PYTHONPATH:$PWD" >> ~/.bashrc
+python -m pip install -r requirements.txt
+

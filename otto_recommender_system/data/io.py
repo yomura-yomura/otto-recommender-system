@@ -119,7 +119,12 @@ def get_pd_tidy_data(
 
     if pd_tidy_data_cachefile_path.exists():
         logger.info(f"loading {pd_tidy_data_cachefile_path}")
-        return pd.read_parquet(pd_tidy_data_cachefile_path)
+        df = pd.read_parquet(pd_tidy_data_cachefile_path)
+        if np.issubdtype(df["type"].dtype, np.object_):
+            print("O -> i4")
+            df["type"] = df["type"].str.decode("utf-8").map(lambda t: all_types.index(t))
+            df.to_parquet(pd_tidy_data_cachefile_path)
+        return df
 
     logger.info(f"creating {pd_tidy_data_cachefile_path}")
     np_tidy_data = get_np_tidy_data(dataset_type, data_path, tidy_data_path)
@@ -127,7 +132,6 @@ def get_pd_tidy_data(
     df.to_parquet(pd_tidy_data_cachefile_path)
 
     return df
-
 
 
 def get_datasets(days=7, type_of_tidy_data="npz", return_train=True, return_valid=True, return_test=True, return_valid_labels=False):

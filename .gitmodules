@@ -1,0 +1,3 @@
+[submodule "kamo731"]
+	path = kamo731
+	url = git@github.com:kamo731/kaggle_otto_recommender_system.git
