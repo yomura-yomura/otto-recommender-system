@@ -134,8 +134,8 @@ def get_pd_tidy_data(
     return df
 
 
-def get_datasets(days=7, type_of_tidy_data="npz", return_train=True, return_valid=True, return_test=True, return_valid_labels=False):
-    dirname = f"{days}days"
+def get_datasets(days=7, weeks=4, type_of_tidy_data="npz", return_train=True, return_valid=True, return_test=True, return_valid_labels=False):
+    dirname = f"{days}days-of-{weeks}weeks"
 
     data_path = project_root_path / "data" / "otto-train-and-test-data-for-local-validation" / dirname / "jsonl"
     tidy_data_path = project_root_path / "data" / "otto-train-and-test-data-for-local-validation" / dirname
