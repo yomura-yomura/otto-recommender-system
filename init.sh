@@ -22,4 +22,4 @@ rm otto-train-and-test-data-for-lv-7days-of-3weeks.zip
 
 echo "export PYTHONPATH=$PYTHONPATH:$PWD" >> ~/.bashrc
 python -m pip install -r requirements.txt
-
+it
