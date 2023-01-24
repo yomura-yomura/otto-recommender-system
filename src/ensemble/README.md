@@ -19,8 +19,8 @@ python -m pip install -r requirements.txt
 ```bash
 time python predict.py chris_sub.csv ver008_cv_0554845.csv --ensemble-type voting --n-top 20
 ```
-ここで、スコアが悪くなるため`--n-top 20`で読み込む各submission fileについてtop 20のaidだけを取り出すように指定している。\
-恐らくaidの順序関係なく重複するものを優先的に取り出すようにしているため、順位の低いものであっても重複すると選ばれやすくなるため。\
+ここで、スコアが悪くなるため`--n-top 20`で読み込む各submission fileについて、session_type毎にtop 20のaidだけを取り出すように指定している。\
+恐らくaidの順序関係なく重複するものを優先的に取り出すようにしているため、順位の低いものであっても重複すると選ばれやすくなるから悪くなる。\
 なお、`--n-top 20`を指定しないときのスコアはLB 0.314であった。
 
 出力例：
