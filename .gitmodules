@@ -1,3 +1,6 @@
 [submodule "kamo731"]
 	path = kamo731
 	url = git@github.com:kamo731/kaggle_otto_recommender_system.git
+[submodule "shaoroon"]
+	path = shaoroon
+	url = git@github.com:shaoroon/kaggle_otto.git
