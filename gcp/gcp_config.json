@@ -1,3 +1,7 @@
 {
-  "instance_name": "a100-40-omura-spot-1"
+  "instance_name": "c2-standard-60-omura-spot-2",
+  "instance_names": [
+    "a100-40-omura-spot-1",
+    "c2-standard-60-omura-spot-2"
+  ]
 }
