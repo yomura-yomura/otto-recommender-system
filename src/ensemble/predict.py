@@ -2,6 +2,7 @@ import warnings
 import polars as pl
 import tqdm
 import argparse
+import numpy as np
 
 
 def read_sub(path):
@@ -27,32 +28,21 @@ def add_vote_col(df, weight):
 def add_rank_weight_col(df, weight, max_session_type_count):
     return (
         df
-        .with_column(pl.lit(-weight).alias("rank_weight"))
+        .with_column(pl.lit(-1).alias("rank_weight"))
         .with_column(pl.col("rank_weight").cumsum().over("session_type"))
-        .with_column(pl.col("rank_weight") + max_session_type_count)
+        .with_column((pl.col("rank_weight") + max_session_type_count + 1) * weight)
     )
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("submission_csv_paths", nargs="+")
-    parser.add_argument("-w", "--weights", nargs="?", action="append", default=None, type=float)
-    parser.add_argument("-e", "--ensemble-type", required=True, choices=["voting", "rank-weighting"])
-    parser.add_argument("-n", "--n-top", default=None, type=int, help="各sessionで使う上位n個のラベルの指定。Noneだと全部使う。")
-    parser.add_argument("-o", "--output", default="{ensemble_type}_submission.csv")
-    args = parser.parse_args()
-
-    submission_csv_paths = args.submission_csv_paths
-    ensemble_type = args.ensemble_type
-    n_top = args.n_top
-    if args.weights is None:
+def main(submission_csv_paths, ensemble_type, n_top, weights, output):
+    if weights is None:
         weights = [1] * len(submission_csv_paths)
     else:
-        if len(args.weights) == len(submission_csv_paths):
+        if len(weights) == len(submission_csv_paths):
             weights = args.weights
         else:
             raise ValueError("option -w/--weights must have the same length values as the given submission_csv_paths")
-    output = args.output.format(weights=weights, ensemble_type=ensemble_type, n_top=n_top)
+    output = output.format(weights=weights, ensemble_type=ensemble_type, n_top=n_top)
 
     print("* Given Parameters:")
     print("{:<25}  =  {:<}".format("submission_csv_paths", str(submission_csv_paths)))
@@ -70,8 +60,8 @@ if __name__ == "__main__":
     subs = list(map(read_sub, tqdm.tqdm(submission_csv_paths, desc="Reading the given submission files")))
 
     if n_top is not None:
-        for sub in subs:
-            sub = sub.groupby("session_type").head(n_top)
+        for i in range(len(subs)):
+            subs[i] = subs[i].groupby("session_type").head(n_top)
 
     if ensemble_type == "voting":
         subs = [
@@ -84,6 +74,14 @@ if __name__ == "__main__":
             add_rank_weight_col(sub, weight, max_count)
             for sub, weight in zip(tqdm.tqdm(subs, desc="Adding rank-weight col"), weights)
         ]
+
+        # rank_weights checks
+        max_rank_weights = np.array([sub["rank_weight"].max() / weight for sub, weight in zip(subs, weights)])
+        assert len(np.unique(max_rank_weights)) == 1
+        if n_top is not None:
+            assert np.all(max_rank_weights == n_top)
+        min_rank_weights = np.array([sub["rank_weight"].min() / weight for sub, weight in zip(subs, weights)])
+        assert np.all(min_rank_weights == 1)
     else:
         raise NotImplementedError(f"ensemble_type == {ensemble_type}")
 
@@ -151,3 +149,15 @@ if __name__ == "__main__":
     target_submission_csv_path = output
     print(f"(5/5) Exporting as {target_submission_csv_path}")
     preds.write_csv(target_submission_csv_path)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("submission_csv_paths", nargs="+")
+    parser.add_argument("-w", "--weights", nargs="?", action="append", default=None, type=float)
+    parser.add_argument("-e", "--ensemble-type", choices=["voting", "rank-weighting"], default="rank-weighting")
+    parser.add_argument("-n", "--n-top", default=40, type=int, help="各sessionで使う上位n個のラベルの指定。Noneだと全部使う。")
+    parser.add_argument("-o", "--output", default="{ensemble_type}_submission.csv")
+    args = parser.parse_args()
+
+    main(args.submission_csv_paths, args.ensemble_type, args.n_top, args.weights, args.output)

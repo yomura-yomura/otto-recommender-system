@@ -30,7 +30,9 @@ if __name__ == "__main__":
             pl.col("aid")
         ])
     )
+
     df = df.groupby(["session", "type"]).head(20)
+    df = df.unique(subset=["session", "aid"])
 
     print("* Reading test_labels.parquet")
     test_labels_df = pl.read_parquet("../../shaoroon/01_Data/add/local-validation_chris/test_labels.parquet")
