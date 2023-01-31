@@ -34,6 +34,15 @@ def add_rank_weight_col(df, weight, max_session_type_count):
     )
 
 
+def add_inverse_rank_weight_col(df, weight):
+    return (
+        df
+        .with_column(pl.lit(1).alias("rank_weight"))
+        .with_column(pl.col("rank_weight").cumsum().over("session_type"))
+        .with_column(weight / pl.col("rank_weight"))
+    )
+
+
 def main(submission_csv_paths, ensemble_type, n_top, weights, output):
     if weights is None:
         weights = [1] * len(submission_csv_paths)
@@ -68,12 +77,20 @@ def main(submission_csv_paths, ensemble_type, n_top, weights, output):
             add_vote_col(sub, weight)
             for sub, weight in zip(tqdm.tqdm(subs, desc="Adding vote col"), weights)
         ]
-    elif ensemble_type == "rank-weighting":
-        max_count = max(sub.groupby("session_type").count().max()[0, "count"] for sub in subs)
-        subs = [
-            add_rank_weight_col(sub, weight, max_count)
-            for sub, weight in zip(tqdm.tqdm(subs, desc="Adding rank-weight col"), weights)
-        ]
+    elif ensemble_type in ("rank-weighting", "inverse-rank-weighting"):
+        if ensemble_type == "rank-weighting":
+            max_count = max(sub.groupby("session_type").count().max()[0, "count"] for sub in subs)
+            subs = [
+                add_rank_weight_col(sub, weight, max_count)
+                for sub, weight in zip(tqdm.tqdm(subs, desc="Adding rank-weight col"), weights)
+            ]
+        elif ensemble_type == "inverse-rank-weighting":
+            subs = [
+                add_inverse_rank_weight_col(sub, weight)
+                for sub, weight in zip(tqdm.tqdm(subs, desc="Adding rank-weight col"), weights)
+            ]
+        else:
+            raise ValueError(ensemble_type)
 
         # rank_weights checks
         max_rank_weights = np.array([sub["rank_weight"].max() / weight for sub, weight in zip(subs, weights)])
@@ -119,10 +136,10 @@ def main(submission_csv_paths, ensemble_type, n_top, weights, output):
             .sort(by="vote_sum")
             .reverse()
         )
-    elif ensemble_type == "rank-weighting":
-        print("(3/5) Calculating total rank_weight")
-
+    elif ensemble_type in ("rank-weighting",  "inverse-rank-weighting"):
+        print("(3/5) Calculating total (inverse) rank_weight")
         target_cols = [col for col in main_sub.columns if col.startswith("rank_weight")]
+
         main_sub = (
             main_sub
             .with_column(pl.sum(target_cols).alias("rank_weight_sum"))
@@ -155,7 +172,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("submission_csv_paths", nargs="+")
     parser.add_argument("-w", "--weights", nargs="?", action="append", default=None, type=float)
-    parser.add_argument("-e", "--ensemble-type", choices=["voting", "rank-weighting"], default="rank-weighting")
+    parser.add_argument("-e", "--ensemble-type", choices=["voting", "rank-weighting", "inverse-rank-weighting"], default="rank-weighting")
     parser.add_argument("-n", "--n-top", default=40, type=int, help="各sessionで使う上位n個のラベルの指定。Noneだと全部使う。")
     parser.add_argument("-o", "--output", default="{ensemble_type}_submission.csv")
     args = parser.parse_args()
