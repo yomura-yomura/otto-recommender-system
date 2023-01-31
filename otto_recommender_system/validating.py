@@ -10,7 +10,6 @@ if not train_test_local_validation_data_path.exists():
     raise FileNotFoundError(train_test_local_validation_data_path)
 
 
-
 async def _validate_coroutine(prediction_csv_path, days):
     prediction_csv_path = pathlib.Path(prediction_csv_path)
     assert prediction_csv_path.exists()
